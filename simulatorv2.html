@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D円柱体積シミュレータ・見やすさ重視版</title>
+    <style>
+        :root {
+            --bg-body: #f0f4f8;
+            --bg-panel: white;
+            --text-main: #334155;
+            --text-heading: #1e40af;
+            --bg-slider: #eff6ff;
+            --border-color: #e2e8f0;
+            --bg-canvas: #fafafa;
+            --formula-bg: #f8fafc;
+            --formula-border: #cbd5e1;
+            --formula-text: #0f172a;
+        }
+
+        body.blackboard-mode {
+            --bg-body: #1e293b;
+            --bg-panel: #0f172a;
+            --text-main: #cbd5e1;
+            --text-heading: #38bdf8;
+            --bg-slider: #1e293b;
+            --border-color: #334155;
+            --bg-canvas: #064e3b; 
+            --formula-bg: #0f172a;
+            --formula-border: #334155;
+            --formula-text: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+        body {
+            font-family: 'Helvetica Neue', Arial, sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            margin: 0;
+            padding: 10px;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        h1 {
+            color: var(--text-heading);
+            font-size: 18px;
+            margin: 0 0 8px 0;
+            text-align: center;
+        }
+        .container {
+            display: flex;
+            background: var(--bg-panel);
+            padding: 12px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            max-width: 1100px;
+            width: 100%;
+            gap: 12px;
+        }
+        
+        .control-panel {
+            flex: 3;
+            min-width: 280px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .visual-panel {
+            flex: 7;
+            min-width: 0; 
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            position: relative;
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 380px;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            background-color: var(--bg-canvas);
+            overflow: hidden;
+        }
+        #canvas3d {
+            width: 100%;
+            height: 100%;
+        }
+        #canvas2d {
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            width: 100px;
+            height: 100px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid #cbd5e1;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            z-index: 20;
+            pointer-events: none;
+        }
+        body.blackboard-mode #canvas2d {
+            background: rgba(15, 23, 42, 0.9);
+            border-color: #334155;
+        }
+
+        .slider-group {
+            background: var(--bg-slider);
+            padding: 6px 10px;
+            border-radius: 6px;
+        }
+        .slider-control-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 4px;
+        }
+        .step-btn {
+            background: #cbd5e1;
+            border: none;
+            color: #334155;
+            width: 26px;
+            height: 26px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+        }
+        .step-btn:hover { background: #94a3b8; }
+        body.blackboard-mode .step-btn {
+            background: #334155;
+            color: #cbd5e1;
+        }
+        body.blackboard-mode .step-btn:hover { background: #475569; }
+
+        label {
+            font-weight: bold;
+            display: block;
+            font-size: 12px;
+        }
+        input[type="range"] {
+            flex: 1;
+            margin: 0;
+            cursor: pointer;
+        }
+        .val {
+            color: #ef4444;
+            font-weight: bold;
+        }
+        body.blackboard-mode .val {
+            color: #f87171;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 6px;
+        }
+        .btn {
+            flex: 2;
+            background-color: #10b981;
+            color: white;
+            border: none;
+            padding: 10px 4px;
+            font-size: 13px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            min-width: 145px;
+            white-space: nowrap;
+        }
+        .btn:hover:not(:disabled) { background-color: #059669; }
+        .btn:active:not(:disabled) { transform: scale(0.98); }
+        .btn:disabled {
+            background-color: #cbd5e1 !important;
+            color: #94a3b8 !important;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        body.blackboard-mode .btn:disabled {
+            background-color: #334155 !important;
+            color: #475569 !important;
+        }
+        
+        .btn-sub {
+            flex: 1;
+            background-color: #64748b;
+            font-size: 11px;
+            padding: 6px;
+            line-height: 1.2;
+            min-width: 0;
+        }
+        .btn-sub:hover { background-color: #475569; }
+        .btn-sub.active { background-color: #334155; }
+
+        .view-btn-group {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            display: flex;
+            gap: 4px;
+            z-index: 40;
+        }
+        .view-btn {
+            background: rgba(255, 255, 255, 0.9);
+            color: #334155;
+            border: 1px solid #cbd5e1;
+            padding: 4px 8px;
+            font-size: 11px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+        body.blackboard-mode .view-btn {
+            background: rgba(30, 41, 59, 0.9);
+            color: #cbd5e1;
+            border-color: #475569;
+        }
+        .view-btn:hover {
+            background: #f1f5f9;
+            border-color: #94a3b8;
+        }
+        body.blackboard-mode .view-btn:hover {
+            background: #475569;
+        }
+        .view-btn.active {
+            background: #1e40af;
+            color: white;
+            border-color: #1e40af;
+        }
+        body.blackboard-mode .view-btn.active {
+            background: #38bdf8;
+            color: #0f172a;
+            border-color: #38bdf8;
+        }
+
+        .formula-box {
+            background: var(--formula-bg);
+            border: 1px solid var(--formula-border);
+            padding: 6px 4px; 
+            border-radius: 6px;
+            text-align: center;
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 11px; 
+            color: var(--text-main);
+        }
+        .formula-large {
+            font-size: 14px; 
+            font-weight: bold;
+            color: var(--formula-text);
+            margin-top: 2px;
+            transition: all 0.3s;
+            white-space: nowrap; 
+        }
+        .highlight-radius { color: #2563eb; font-weight: bold; padding: 0 3px; border-radius: 3px; display: inline-block; }
+        .highlight-height { color: #16a34a; font-weight: bold; padding: 0 3px; border-radius: 3px; display: inline-block; }
+        body.blackboard-mode .highlight-radius { color: #60a5fa; }
+        body.blackboard-mode .highlight-height { color: #4ade80; }
+
+        .info-box {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            color: #451a03;
+            padding: 8px 10px;
+            font-size: 11px;
+            line-height: 1.4;
+            border-radius: 4px;
+            height: 110px;
+            overflow-y: auto;
+        }
+        body.blackboard-mode .info-box {
+            background: #78350f;
+            border-left-color: #fbbf24;
+            color: #fef3c7;
+        }
+        .hint {
+            position: absolute;
+            top: 8px;
+            left: 8px;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            padding: 3px 6px;
+            font-size: 10px;
+            border-radius: 4px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .color-blue { color: #2563eb; font-weight: bold; }
+        .color-white-text { color: #64748b; font-weight: bold; } 
+        .color-green { color: #16a34a; font-weight: bold; }
+        body.blackboard-mode .color-blue { color: #60a5fa; }
+        body.blackboard-mode .color-white-text { color: #cbd5e1; }
+        body.blackboard-mode .color-green { color: #4ade80; }
+
+        .grid-tick-label {
+            position: absolute;
+            z-index: 30;
+            font-size: 10px;
+            font-weight: bold;
+            color: #475569; 
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+            white-space: nowrap;
+            padding: 1px 2px;
+            background: rgba(255, 255, 255, 0.6);
+            border-radius: 2px;
+        }
+        body.blackboard-mode .grid-tick-label {
+            color: #94a3b8;
+            background: rgba(15, 23, 42, 0.6);
+        }
+        .grid-tick-label.dark-text {
+            color: #0f172a; 
+            background: rgba(255, 255, 255, 0.85);
+        }
+        body.blackboard-mode .grid-tick-label.dark-text {
+            color: #f8fafc;
+            background: rgba(15, 23, 42, 0.85);
+        }
+
+        @media (max-width: 768px) {
+            body { overflow: auto; height: auto; }
+            .container { flex-direction: column; }
+            .canvas-container { height: 300px; }
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+
+    <h1>📦 3D円柱体積シミュレータ</h1>
+
+    <div class="container">
+        <div class="control-panel">
+            <div class="slider-group">
+                <label>① 半径: <span id="r-val" class="val">3</span> cm</label>
+                <div class="slider-control-row">
+                    <button class="step-btn" id="r-minus">−</button>
+                    <input type="range" id="radius" min="0" max="10" value="3" step="0.5">
+                    <button class="step-btn" id="r-plus">＋</button>
+                </div>
+            </div>
+            <div class="slider-group">
+                <label>② 高さ <span class="color-green">(y軸)</span>: <span id="h-val" class="val">5</span> cm</label>
+                <div class="slider-control-row">
+                    <button class="step-btn" id="h-minus">−</button>
+                    <input type="range" id="height" min="0" max="10" value="5" step="0.5">
+                    <button class="step-btn" id="h-plus">＋</button>
+                </div>
+            </div>
+            <div class="slider-group">
+                <label>③ 分ける数: <span id="p-val" class="val">16</span> 等分</label>
+                <div class="slider-control-row">
+                    <button class="step-btn" id="p-minus">−</button>
+                    <input type="range" id="pieces" min="0" max="128" value="16" step="8">
+                    <button class="step-btn" id="p-plus">＋</button>
+                </div>
+            </div>
+
+            <div class="btn-group">
+                <button id="btn-toggle" class="btn">▶ 3Dへんしん！</button>
+                <button id="btn-grid-density" class="btn btn-sub">グリッド<br>くっきり</button>
+                <button id="btn-blackboard" class="btn btn-sub">こくばん<br>モード</button>
+            </div>
+
+            <div class="formula-box">
+                <div>【円柱の体積 ＝ 底面積 ✕ 高さ】</div>
+                <div id="formula-text" class="formula-large">0 ✕ 0 ✕ 3.14 ✕ 0 ＝ 0 ㎤</div>
+            </div>
+
+            <div class="info-box" id="info">
+                「へんしん！」ボタンを押すと、円柱がケーキのように切られて、青と白が交互に並び替わります。
+            </div>
+        </div>
+
+        <div class="visual-panel">
+            <div class="hint" id="interaction-hint">🖱️ ドラッグで回転 / ホイールでズーム</div>
+            
+            <div class="view-btn-group">
+                <button class="view-btn" id="view-top">👁️ 真上</button>
+                <button class="view-btn" id="view-front">👁️ 真横</button>
+                <button class="view-btn active" id="view-iso">🔄 斜め</button>
+                <button class="view-btn" id="view-reset">🏠 リセット</button>
+            </div>
+
+            <div class="canvas-container" id="canvas-holder">
+                <div id="canvas3d"></div>
+                <canvas id="canvas2d" width="100" height="100"></canvas>
+                <div id="grid-labels-layer" style="position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:30;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const container = document.getElementById('canvas3d');
+        const holder = document.getElementById('canvas-holder');
+        const labelLayer = document.getElementById('grid-labels-layer');
+        const scene = new THREE.Scene();
+        
+        const colors = {
+            light: { bg: 0xfafafa, gridCenter: 0x475569, gridLine: 0xcad4df, guide: 0xd1d5db },
+            dark: { bg: 0x064e3b, gridCenter: 0xa7f3d0, gridLine: 0x047857, guide: 0x065f46 }
+        };
+        let currentTheme = 'light';
+        scene.background = new THREE.Color(colors.light.bg);
+
+        const persCamera = new THREE.PerspectiveCamera(45, container.clientWidth / 380, 0.1, 1000);
+        persCamera.position.set(8, 12, 18);
+
+        const aspect = container.clientWidth / 380;
+        const viewSize = 24; 
+        const orthoCamera = new THREE.OrthographicCamera(
+            -viewSize * aspect / 2, viewSize * aspect / 2,
+            viewSize / 2, -viewSize / 2,
+            0.1, 1000
+        );
+
+        let camera = persCamera;
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(container.clientWidth, 380);
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        let controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.maxPolarAngle = Math.PI / 2; 
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        dirLight.position.set(15, 25, 15);
+        scene.add(dirLight);
+
+        let gridHelper, wallGrid, guideBox;
+        let isGridDark = false; 
+        const tickPositions = [];
+
+        function updateGrids() {
+            if (gridHelper) scene.remove(gridHelper);
+            if (wallGrid) scene.remove(wallGrid);
+            if (guideBox) scene.remove(guideBox);
+
+            const theme = colors[currentTheme];
+            let centerLineColor = isGridDark ? (currentTheme==='light'?0x0f172a:0xffffff) : theme.gridCenter;
+            let gridLineColor = isGridDark ? theme.gridCenter : theme.gridLine;
+
+            gridHelper = new THREE.GridHelper(24, 24, centerLineColor, gridLineColor);
+            gridHelper.position.y = -0.01;
+            scene.add(gridHelper);
+
+            const wallGroup = new THREE.Group();
+            const material = new THREE.LineBasicMaterial({ color: gridLineColor });
+            const centerMaterial = new THREE.LineBasicMaterial({ color: centerLineColor });
+            
+            for(let y=0; y<=10; y++) {
+                const points = [new THREE.Vector3(-12, y, 0), new THREE.Vector3(12, y, 0)];
+                const geo = new THREE.BufferGeometry().setFromPoints(points);
+                wallGroup.add(new THREE.Line(geo, y === 0 ? centerMaterial : material));
+            }
+            for(let x=-12; x<=12; x++) {
+                const points = [new THREE.Vector3(x, 0, 0), new THREE.Vector3(x, 10, 0)];
+                const geo = new THREE.BufferGeometry().setFromPoints(points);
+                wallGroup.add(new THREE.Line(geo, x === 0 ? centerMaterial : material));
+            }
+            wallGrid = wallGroup;
+            scene.add(wallGrid);
+
+            const boxGeo = new THREE.BoxGeometry(24, 10, 24);
+            const edges = new THREE.EdgesGeometry(boxGeo);
+            guideBox = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: theme.guide, transparent: true, opacity: 0.4 }));
+            guideBox.position.set(0, 5, 0);
+            scene.add(guideBox);
+
+            tickPositions.length = 0;
+            labelLayer.innerHTML = '';
+
+            createTickDOM(new THREE.Vector3(0, 0.1, 0), 0);
+            for (let i = 1; i <= 10; i++) {
+                createTickDOM(new THREE.Vector3(0, i, 0), i);      
+                createTickDOM(new THREE.Vector3(i, 0.05, 0), i);   
+                createTickDOM(new THREE.Vector3(-i, 0.05, 0), i);  
+                createTickDOM(new THREE.Vector3(0, 0.05, i), i);   
+            }
+        }
+
+        function createTickDOM(worldPos, val) {
+            const div = document.createElement('div');
+            div.className = 'grid-tick-label';
+            if (isGridDark) div.classList.add('dark-text');
+            div.innerText = val;
+            labelLayer.appendChild(div);
+            tickPositions.push({ element: div, worldPos: worldPos });
+        }
+
+        let meshes = [];
+        const cylinderGroup = new THREE.Group();
+        scene.add(cylinderGroup);
+
+        let progress = 0;
+        let targetProgress = 0;
+        let isAnimating = false;
+
+        let cameraAnimation = { active: false, targetPos: new THREE.Vector3(), targetLook: new THREE.Vector3(), alpha: 0 };
+
+        const canvas2d = document.getElementById('canvas2d');
+        const ctx2d = canvas2d.getContext('2d');
+
+        function createPieGeometry(r, h, angle) {
+            const shape = new THREE.Shape();
+            shape.moveTo(0, 0);
+            shape.arc(0, 0, r, -angle/2, angle/2, false);
+            shape.lineTo(0, 0);
+            const settings = { depth: h, bevelEnabled: false };
+            const geometry = new THREE.ExtrudeGeometry(shape, settings);
+            geometry.rotateX(-Math.PI / 2);
+            return geometry;
+        }
+
+        function createArcLineGeometry(r, h, angle) {
+            const points = [];
+            const segments = 16;
+            for(let i=0; i<=segments; i++){
+                const theta = -angle/2 + (angle * (i / segments));
+                points.push(new THREE.Vector3(r * Math.cos(theta), 0, r * Math.sin(theta)));
+            }
+            const curve = new THREE.CatmullRomCurve3(points);
+            return new THREE.TubeGeometry(curve, 16, 0.04, 4, false);
+        }
+
+        function clearCylinderGroup() {
+            while(cylinderGroup.children.length > 0){
+                const obj = cylinderGroup.children[0];
+                cylinderGroup.remove(obj);
+                if(obj.geometry) obj.geometry.dispose();
+                if(obj.children) {
+                    obj.children.forEach(c => { if(c.geometry) c.geometry.dispose(); if(c.material) c.material.dispose(); });
+                }
+                if(obj.material) {
+                    if(Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+                    else obj.material.dispose();
+                }
+            }
+        }
+
+        function initObjects() {
+            clearCylinderGroup();
+            meshes = [];
+
+            const rawRadius = parseFloat(document.getElementById('radius').value);
+            const rawHeight = parseFloat(document.getElementById('height').value);
+            const rawPieces = parseInt(document.getElementById('pieces').value);
+
+            document.getElementById('r-val').innerText = rawRadius;
+            document.getElementById('h-val').innerText = rawHeight;
+            document.getElementById('p-val').innerText = rawPieces;
+
+            const area = (rawRadius * rawRadius * 3.14).toFixed(1);
+            const volume = (area * rawHeight).toFixed(1);
+
+            document.getElementById('formula-text').innerHTML = 
+                `<span id="f-radius" class="highlight-radius">${rawRadius}</span> ✕ <span id="f-radius2" class="highlight-radius">${rawRadius}</span> ✕ 3.14 ✕ <span id="f-height" class="highlight-height">${rawHeight}</span> ＝ <strong>${volume}</strong> ㎤`;
+
+            if (rawPieces === 0) {
+                if (rawRadius > 0 && rawHeight > 0) {
+                    const cylGeo = new THREE.CylinderGeometry(rawRadius, rawRadius, rawHeight, 64);
+                    cylGeo.translate(0, rawHeight/2, 0);
+                    const cylMat = new THREE.MeshStandardMaterial({
+                        color: 0x1e3a8a,
+                        roughness: 0.5,
+                        metalness: 0.1
+                    });
+                    const fullCylinder = new THREE.Mesh(cylGeo, cylMat);
+                    cylinderGroup.add(fullCylinder);
+                }
+                updatePositions();
+                return;
+            }
+
+            const r = rawRadius === 0 ? 0.001 : rawRadius;
+            const h = rawHeight === 0 ? 0.001 : rawHeight;
+            const pieces = rawPieces;
+
+            const anglePerPiece = (Math.PI * 2) / pieces;
+            const pieceWidth = r * Math.sin(anglePerPiece / 2) * 2;
+
+            for (let i = 0; i < pieces; i++) {
+                const geo = createPieGeometry(r, h, anglePerPiece);
+                const isEven = i % 2 === 0;
+
+                const mat = new THREE.MeshStandardMaterial({
+                    color: isEven ? 0x1e3a8a : 0xa1a1aa, 
+                    roughness: 0.5,
+                    metalness: 0.1,
+                    side: THREE.DoubleSide
+                });
+
+                const mesh = new THREE.Mesh(geo, mat);
+
+                if(rawPieces > 0 && rawRadius > 0) {
+                    const arcGeo = createArcLineGeometry(r, h, anglePerPiece);
+                    const arcMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.2, roughness: 0.4 });
+                    const arcMeshTop = new THREE.Mesh(arcGeo, arcMat);
+                    const arcMeshBottom = new THREE.Mesh(arcGeo, arcMat);
+                    arcMeshTop.position.y = h;
+                    mesh.add(arcMeshTop);
+                    mesh.add(arcMeshBottom);
+                }
+
+                cylinderGroup.add(mesh);
+
+                const startAngle = i * anglePerPiece;
+                const midAngle = startAngle + anglePerPiece / 2;
+                
+                const startPos = new THREE.Vector3(0, 0, 0);
+                const startRot = new THREE.Euler(0, -midAngle, 0);
+
+                const targetX = (-(pieces * pieceWidth) / 4) + Math.floor(i / 2) * pieceWidth + (isEven ? 0 : pieceWidth/2);
+                const targetZ = isEven ? (r/2 * Math.cos(anglePerPiece/2)) : (-r/2 * Math.cos(anglePerPiece/2));
+                const targetRotY = isEven ? Math.PI/2 : -Math.PI/2;
+
+                const targetPos = new THREE.Vector3(targetX, 0, targetZ);
+                const targetRot = new THREE.Euler(0, targetRotY, 0);
+
+                meshes.push({ mesh, startPos, startRot, targetPos, targetRot, isEven, i });
+            }
+
+            updatePositions();
+        }
+
+        function updateAllLabels() {
+            const w = holder.clientWidth;
+            const h = holder.clientHeight;
+            const wp = new THREE.Vector3();
+
+            tickPositions.forEach(tick => {
+                wp.copy(tick.worldPos);
+                wp.project(camera);
+
+                if (wp.z > 1 || wp.z < -1) {
+                    tick.element.style.display = 'none';
+                    return;
+                }
+                tick.element.style.display = 'block';
+                const x = (wp.x * 0.5 + 0.5) * w;
+                const y = (-(wp.y * 0.5) + 0.5) * h;
+                tick.element.style.left = `${x}px`;
+                tick.element.style.top = `${y}px`;
+            });
+        }
+
+        function updatePositions() {
+            const r = parseFloat(document.getElementById('radius').value);
+            const h = parseFloat(document.getElementById('height').value);
+            const p = parseInt(document.getElementById('pieces').value);
+
+            meshes.forEach(item => {
+                item.mesh.position.lerpVectors(item.startPos, item.targetPos, progress);
+                item.mesh.rotation.x = THREE.MathUtils.lerp(item.startRot.x, item.targetRot.x, progress);
+                item.mesh.rotation.y = THREE.MathUtils.lerp(item.startRot.y, item.targetRot.y, progress);
+                item.mesh.rotation.z = THREE.MathUtils.lerp(item.startRot.z, item.targetRot.z, progress);
+            });
+
+            if (camera === persCamera) {
+                labelLayer.style.display = 'none';
+            } else {
+                labelLayer.style.display = 'block';
+                updateAllLabels();
+            }
+
+            draw2DMap();
+
+            const info = document.getElementById('info');
+            const btn = document.getElementById('btn-toggle');
+            const halfCircum = (r * 3.14).toFixed(1);
+
+            if (p === 0) {
+                btn.disabled = true;
+                btn.innerText = "❌ 等分を選択してね";
+                info.innerHTML = `<strong>💡 準備をしよう！</strong><br>「③ 分ける数」のスライダーを動かして、円柱をいくつかのパーツに切り分けてみましょう。分ければ分けるほど、並び替えたときに綺麗な直方体に近づきます！`;
+            } else {
+                btn.disabled = false;
+                if (r === 0 || h === 0) {
+                    info.innerHTML = `<strong>⚠️ パラメータが 0 になっています</strong><br>スライダーを動かして形を作ってみよう。`;
+                } else if (progress > 0.9) {
+                    info.innerHTML = `<strong>💡 直方体にへんしん！</strong><br>
+                    円柱を細かく分けて並び替えると、見事に<strong>直方体</strong>に変身しました！<br>
+                    * <strong>たて</strong> ＝ もとの円柱の<strong>「半径 (${r}cm)」</strong><br>
+                    * <strong>よこ</strong> ＝ 円周の半分<strong>「底面のまわりの長さの半分 (${halfCircum}cm)」</strong><br>
+                    * <strong>高さ</strong> ＝ もとの円柱の<strong>「高さ (${h}cm)」</strong>`;
+                    btn.innerText = "🔄 元の円柱にもどす";
+                    btn.style.backgroundColor = "#6b7280";
+                } else if (progress < 0.1) {
+                    info.innerHTML = `「へんしん！」ボタンを押すと並び替わります。右上のカメラボタンで真上や真横に変えてみると、マスの数がさらに数えやすくなりますよ！`;
+                    btn.innerText = "▶ 3Dへんしん！";
+                    btn.style.backgroundColor = "#10b981";
+                }
+            }
+        }
+
+        function draw2DMap() {
+            ctx2d.clearRect(0, 0, 100, 100);
+            const r = parseFloat(document.getElementById('radius').value);
+            const pieces = parseInt(document.getElementById('pieces').value);
+            if(r === 0) return;
+
+            if(pieces === 0) {
+                ctx2d.fillStyle = "rgba(30, 58, 138, 0.9)";
+                ctx2d.beginPath();
+                ctx2d.arc(50, 50, r * 4.2, 0, Math.PI * 2);
+                ctx2d.fill();
+                ctx2d.strokeStyle = "#94a3b8";
+                ctx2d.stroke();
+                return;
+            }
+
+            const cx = 50, cy = 50;
+            const scale = 4.2; 
+            const anglePerPiece = (Math.PI * 2) / pieces;
+            const pieceWidth = r * Math.sin(anglePerPiece / 2) * 2;
+
+            for(let i=0; i<pieces; i++) {
+                const isEven = i % 2 === 0;
+                ctx2d.fillStyle = isEven ? "rgba(30, 58, 138, 0.9)" : "rgba(161, 161, 170, 0.95)";
+                ctx2d.save();
+
+                const startAngle = i * anglePerPiece;
+                const currentAngle = THREE.MathUtils.lerp(startAngle, isEven ? Math.PI/2 : -Math.PI/2, progress);
+
+                const targetX = cx + (((-(pieces * pieceWidth) / 4) + Math.floor(i / 2) * pieceWidth + (isEven ? 0 : pieceWidth/2)) * scale);
+                const targetZ = cy + ((isEven ? (r/2) : (-r/2)) * scale);
+
+                const currentX = THREE.MathUtils.lerp(cx, targetX, progress);
+                const currentY = THREE.MathUtils.lerp(cy, targetZ, progress);
+
+                ctx2d.translate(currentX, currentY);
+                ctx2d.rotate(currentAngle);
+                
+                ctx2d.beginPath();
+                ctx2d.moveTo(0,0);
+                ctx2d.arc(0,0, r*scale, -anglePerPiece/2, anglePerPiece/2);
+                ctx2d.closePath();
+                ctx2d.fill();
+
+                ctx2d.strokeStyle = "#94a3b8"; 
+                ctx2d.beginPath();
+                ctx2d.arc(0,0, r*scale, -anglePerPiece/2, anglePerPiece/2);
+                ctx2d.stroke();
+                ctx2d.restore();
+            }
+        }
+
+        function switchCamera(newCamera) {
+            if (camera === newCamera) return;
+            controls.dispose();
+            camera = newCamera;
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2;
+        }
+
+        function moveCameraSmoothly(toPos, toLook) {
+            cameraAnimation.targetPos.copy(toPos);
+            cameraAnimation.targetLook.copy(toLook);
+            cameraAnimation.alpha = 0;
+            cameraAnimation.active = true;
+            controls.enabled = false; 
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (cameraAnimation.active) {
+                cameraAnimation.alpha += 0.05;
+                camera.position.lerp(cameraAnimation.targetPos, 0.1);
+                controls.target.lerp(cameraAnimation.targetLook, 0.1);
+                if (cameraAnimation.alpha >= 1.0) {
+                    camera.position.copy(cameraAnimation.targetPos);
+                    controls.target.copy(cameraAnimation.targetLook);
+                    cameraAnimation.active = false;
+                    controls.enabled = true;
+                }
+            }
+
+            if (isAnimating) {
+                if (progress < targetProgress) {
+                    progress += 0.01;
+                    if (progress >= targetProgress) { progress = targetProgress; isAnimating = false; }
+                } else {
+                    progress -= 0.01;
+                    if (progress <= targetProgress) { progress = targetProgress; isAnimating = false; }
+                }
+            }
+
+            updatePositions();
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function setActiveButton(activeId) {
+            ['view-top', 'view-front', 'view-iso'].forEach(id => {
+                if(id === activeId) document.getElementById(id).classList.add('active');
+                else document.getElementById(id).classList.remove('active');
+            });
+        }
+
+        document.getElementById('view-top').addEventListener('click', () => {
+            switchCamera(orthoCamera);
+            moveCameraSmoothly(new THREE.Vector3(0, 24, 0), new THREE.Vector3(0, 0, 0));
+            setActiveButton('view-top');
+            document.getElementById('interaction-hint').innerText = "🔒 スナップ中（斜めで解除）";
+            controls.enableRotate = false; 
+        });
+
+        document.getElementById('view-front').addEventListener('click', () => {
+            switchCamera(orthoCamera);
+            moveCameraSmoothly(new THREE.Vector3(0, 5, 24), new THREE.Vector3(0, 5, 0));
+            setActiveButton('view-front');
+            document.getElementById('interaction-hint').innerText = "🔒 スナップ中（斜めで解除）";
+            controls.enableRotate = false; 
+        });
+
+        document.getElementById('view-iso').addEventListener('click', () => {
+            switchCamera(persCamera);
+            moveCameraSmoothly(new THREE.Vector3(8, 12, 18), new THREE.Vector3(0, 0, 0));
+            setActiveButton('view-iso');
+            document.getElementById('interaction-hint').innerText = "🖱️ ドラッグで回転 / ホイールでズーム";
+            controls.enableRotate = true; 
+        });
+
+        document.getElementById('view-reset').addEventListener('click', () => {
+            switchCamera(persCamera);
+            moveCameraSmoothly(new THREE.Vector3(8, 12, 18), new THREE.Vector3(0, 0, 0));
+            setActiveButton('view-iso');
+            document.getElementById('interaction-hint').innerText = "🖱️ ドラッグで回転 / ホイールでズーム";
+            controls.enableRotate = true;
+        });
+
+        document.getElementById('btn-toggle').addEventListener('click', () => {
+            if (isAnimating || parseInt(document.getElementById('pieces').value) === 0) return;
+            targetProgress = (targetProgress === 0) ? 1 : 0;
+            isAnimating = true;
+        });
+
+        document.getElementById('btn-grid-density').addEventListener('click', (e) => {
+            isGridDark = !isGridDark;
+            if (isGridDark) {
+                e.target.classList.add('active');
+                e.target.innerHTML = "グリッド<br>うすくする";
+            } else {
+                e.target.classList.remove('active');
+                e.target.innerHTML = "グリッド<br>くっきり";
+            }
+            updateGrids(); 
+        });
+
+        document.getElementById('btn-blackboard').addEventListener('click', (e) => {
+            document.body.classList.toggle('blackboard-mode');
+            const isDark = document.body.classList.contains('blackboard-mode');
+            currentTheme = isDark ? 'dark' : 'light';
+            scene.background = new THREE.Color(colors[currentTheme].bg);
+            
+            if(isDark) {
+                e.target.classList.add('active');
+                e.target.innerHTML = "しろ枠<br>モード";
+            } else {
+                e.target.classList.remove('active');
+                e.target.innerHTML = "こくばん<br>モード";
+            }
+            updateGrids();
+        });
+        
+        function setupStepButton(btnId, inputId, direction) {
+            document.getElementById(btnId).addEventListener('click', () => {
+                const input = document.getElementById(inputId);
+                const step = parseFloat(input.step) || 1;
+                const min = parseFloat(input.min) || 0;
+                const max = parseFloat(input.max) || 100;
+                let val = parseFloat(input.value);
+                
+                val = direction === 'plus' ? val + step : val - step;
+                if(val < min) val = min;
+                if(val > max) val = max;
+                
+                input.value = val;
+                resetAndRebuild();
+            });
+        }
+        setupStepButton('r-minus', 'radius', 'minus');
+        setupStepButton('r-plus', 'radius', 'plus');
+        setupStepButton('h-minus', 'height', 'minus');
+        setupStepButton('h-plus', 'height', 'plus');
+        setupStepButton('p-minus', 'pieces', 'minus');
+        setupStepButton('p-plus', 'pieces', 'plus');
+
+        function resetAndRebuild() {
+            targetProgress = 0;
+            progress = 0;
+            isAnimating = false;
+            initObjects();
+        }
+
+        const inputs = ['radius', 'height', 'pieces'];
+        inputs.forEach(id => document.getElementById(id).addEventListener('input', (e) => {
+            resetAndRebuild();
+        }));
+
+        window.addEventListener('resize', () => {
+            const w = container.clientWidth;
+            const h = 380;
+            const newAspect = w / h;
+
+            persCamera.aspect = newAspect;
+            persCamera.updateProjectionMatrix();
+
+            orthoCamera.left = -viewSize * newAspect / 2;
+            orthoCamera.right = viewSize * newAspect / 2;
+            orthoCamera.top = viewSize / 2;
+            orthoCamera.bottom = -viewSize / 2;
+            orthoCamera.updateProjectionMatrix();
+
+            renderer.setSize(w, h);
+        });
+
+        updateGrids();
+        initObjects();
+        animate();
+    </script>
+</body>
+</html>
